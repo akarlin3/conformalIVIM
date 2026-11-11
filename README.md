@@ -1,5 +1,6 @@
 # `conformalIVIM` (`conformal-ivim`)
 
+[![CI](https://github.com/akarlin3/conformalIVIM/actions/workflows/ci.yml/badge.svg)](https://github.com/akarlin3/conformalIVIM/actions/workflows/ci.yml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20694662.svg)](https://doi.org/10.5281/zenodo.20694662)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
@@ -14,13 +15,16 @@
 ## 3-Line Quickstart
 
 ```bash
-pip install conformal-ivim
+pip install git+https://github.com/akarlin3/conformalIVIM.git
 python -c "from conformal_ivim import ConformalIVIM, generate_cohort; c = generate_cohort(400, 400, 200); m = ConformalIVIM(method='cqr', alpha=0.10).fit_calibrate(c.signals['train'], c.params['train'], c.signals['cal'], c.params['cal']); lo, hi = m.predict_interval(c.signals['test']); print('90% interval shapes:', lo.shape, hi.shape)"
 ```
 
-To install from source with optional plotting and development extras:
+Once published on PyPI, or to install from a local checkout with optional plotting and development extras:
 
 ```bash
+pip install conformal-ivim
+
+# Editable install from source:
 git clone https://github.com/akarlin3/conformalIVIM.git
 cd conformalIVIM
 pip install -e ".[plotting,dev]"
