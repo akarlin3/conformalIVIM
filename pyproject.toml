@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling>=1.18.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "conformal-ivim"
+version = "1.0.0"
+description = "Distribution-free conformal prediction intervals and label-free deployment monitoring for IVIM diffusion MRI"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Avery Karlin", email = "ak5232@columbia.edu" },
+]
+keywords = [
+    "IVIM",
+    "diffusion MRI",
+    "DWI",
+    "conformal prediction",
+    "conformalized quantile regression",
+    "uncertainty quantification",
+    "deployment monitoring",
+    "covariate shift",
+    "quantitative MRI",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Typing :: Typed",
+]
+dependencies = [
+    "numpy>=1.22.0",
+    "scipy>=1.8.0",
+    "scikit-learn>=1.2.0",
+]
+
+[project.optional-dependencies]
+plotting = [
+    "matplotlib>=3.5.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "build>=1.0.0",
+    "twine>=4.0.0",
+    "matplotlib>=3.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/akarlin3/conformalIVIM"
+Repository = "https://github.com/akarlin3/conformalIVIM"
+Issues = "https://github.com/akarlin3/conformalIVIM/issues"
+Zenodo = "https://doi.org/10.5281/zenodo.20694662"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/conformal_ivim"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/README.md",
+    "/LICENSE",
+    "/CITATION.cff",
+    "/pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

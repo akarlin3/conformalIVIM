@@ -1,0 +1,50 @@
+cff-version: 1.2.0
+title: "conformalIVIM: Distribution-Free Conformal Prediction Intervals and Label-Free Deployment Monitoring for IVIM Diffusion MRI"
+message: "If you use conformal-ivim in your research, please cite the software archive and the companion Magnetic Resonance in Medicine manuscript below."
+type: software
+authors:
+  - family-names: "Karlin"
+    given-names: "Avery"
+    email: "ak5232@columbia.edu"
+    orcid: "https://orcid.org/0000-0003-3848-6782"
+    affiliation: "Columbia University, Department of Applied Physics and Applied Mathematics; University of Colorado Boulder, Department of Computer Science; The Annealing Signet Institute"
+repository-code: "https://github.com/akarlin3/conformalIVIM"
+url: "https://github.com/akarlin3/conformalIVIM"
+doi: "10.5281/zenodo.20694662"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.20694662"
+    description: "Zenodo software archive for conformalIVIM"
+license: MIT
+version: 1.0.0
+date-released: 2026-11-10
+keywords:
+  - IVIM
+  - intravoxel incoherent motion
+  - diffusion MRI
+  - uncertainty quantification
+  - conformal prediction
+  - conformalized quantile regression
+  - deployment monitoring
+  - distribution shift
+  - quantitative MRI
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Karlin"
+      given-names: "Avery"
+      email: "ak5232@columbia.edu"
+      orcid: "https://orcid.org/0000-0003-3848-6782"
+      affiliation: "Columbia University, Department of Applied Physics and Applied Mathematics; University of Colorado Boulder, Department of Computer Science; The Annealing Signet Institute"
+  title: "Distribution-Free Conformal Uncertainty Calibration for IVIM Parameter Maps: Characterizing High-D* Conditional Coverage Limits in Single- and Multi-Echo Acquisitions"
+  journal: "Magnetic Resonance in Medicine"
+  year: 2026
+references:
+  - type: software
+    authors:
+      - family-names: "Karlin"
+        given-names: "Avery"
+    title: "conformalIVIM (Zenodo Archive)"
+    doi: "10.5281/zenodo.20694662"
+    url: "https://doi.org/10.5281/zenodo.20694662"
+    year: 2026
