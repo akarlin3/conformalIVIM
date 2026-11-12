@@ -225,6 +225,40 @@ def conditional_conformal(
     return qr.predict(test_Phi)
 
 
+def aci_conformal(
+    cal_pred,
+    cal_true,
+    stream_pred,
+    stream_true,
+    alpha: float = 0.10,
+    gamma: float = 0.02,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Online Adaptive Conformal Inference (ACI; Gibbs & Candès, 2021).
+
+    Tracks time-varying effective miscoverage ``alpha_t`` via online gradient updates
+    ``alpha_{t+1} = clip(alpha_t + gamma * (alpha - err_t), 1e-4, 1 - 1e-4)`` against a
+    calibration score buffer, returning ``(lower, upper, alpha_trace)``.
+    """
+    cal_scores = np.abs(np.asarray(cal_true, dtype=float) - np.asarray(cal_pred, dtype=float))
+    s_pred = np.asarray(stream_pred, dtype=float).ravel()
+    s_true = np.asarray(stream_true, dtype=float).ravel()
+    n_stream = s_pred.size
+    lo = np.empty(n_stream, dtype=float)
+    hi = np.empty(n_stream, dtype=float)
+    alpha_trace = np.empty(n_stream, dtype=float)
+    alpha_t = float(alpha)
+    for t in range(n_stream):
+        alpha_trace[t] = alpha_t
+        q_t = conformal_quantile(cal_scores, alpha_t)
+        if not np.isfinite(q_t):
+            q_t = float(np.max(cal_scores)) if cal_scores.size else 0.0
+        lo[t] = s_pred[t] - q_t
+        hi[t] = s_pred[t] + q_t
+        err_t = 1.0 if (s_true[t] < lo[t] or s_true[t] > hi[t]) else 0.0
+        alpha_t = float(np.clip(alpha_t + float(gamma) * (float(alpha) - err_t), 1e-4, 1.0 - 1e-4))
+    return lo, hi, alpha_trace
+
+
 # --------------------------------------------------------------------------- #
 # High-Level Public Wrapper: ConformalIVIM
 # --------------------------------------------------------------------------- #

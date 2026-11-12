@@ -8,7 +8,20 @@
 
 **Distribution-free conformal prediction intervals and label-free deployment monitoring for IVIM diffusion MRI.**
 
-`conformal-ivim` provides finite-sample, distribution-free per-voxel uncertainty intervals for intravoxel incoherent motion (IVIM) diffusion-weighted MRI parameters $(D, D^{*}, f)$ alongside a label-free two-sample deployment validity monitor that flags observable exchangeability breaks on unlabeled clinical or phantom test batches.
+`conformal-ivim` provides finite-sample, distribution-free per-voxel uncertainty intervals for intravoxel incoherent motion (IVIM) diffusion-weighted MRI parameters $(D, D^{*}, f)$ alongside a label-free two-sample deployment validity monitor and per-voxel conformal OOD gate that flag observable exchangeability breaks on unlabeled clinical or phantom test batches.
+
+---
+
+## AveryCorp Scientific Suites Architecture
+
+`conformalIVIM` is **Stage 2** of the **AveryCorp Open Scientific Software Ecosystem**, sharing a standardized `AuditReport` diagnostic schema (`conformal-ivim audit --json` / `run_audit()`) across two non-overlapping suites:
+
+- **Suite I: Clinical Quantitative-MRI Trust Spine (`Diagnose -> Calibrate -> Benchmark`)**
+  - [`sextantIVIM`](https://github.com/akarlin3/sextantIVIM) (Stage 1): Forward NLLS fitting, Fisher CRLB & assumption-free $D^*$ boundary-railing gate ->
+  - **[`conformalIVIM`](https://github.com/akarlin3/conformalIVIM) (Stage 2 — *This Package*)**: Split/CQR/Mondrian/ACI finite-sample conformal calibration, cohort shift & voxel OOD gate ->
+  - [`IVIMBench`](https://github.com/akarlin3/IVIMBench) (Stage 3): Canonical DRO phantoms, clean-room Gnomon/Caliper rulers & closed-loop adaptive RT benchmark.
+- **Suite II: Scientific Identifiability & Null-Audit Suite**
+  - [`weakSINDY`](https://github.com/akarlin3/weakSINDY) (Dynamical & Fractional PDEs) · [`chimeraAnneal`](https://github.com/akarlin3/chimeraAnneal) (Metastable Oscillator Survival) · [`proteusMine`](https://github.com/akarlin3/proteusMine) (Structural Bioinformatics TOST Auditing).
 
 ---
 

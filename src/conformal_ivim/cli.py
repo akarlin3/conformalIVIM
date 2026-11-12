@@ -141,13 +141,42 @@ def build_parser() -> argparse.ArgumentParser:
     demo_p.add_argument("--n-train", type=int, default=350, help="Synthetic training size.")
     demo_p.add_argument("--n-cal", type=int, default=200, help="Synthetic calibration size.")
     demo_p.add_argument("--n-test", type=int, default=200, help="Synthetic test size.")
+    demo_p.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit standardized AveryCorp AuditReport JSON diagnostic.",
+    )
+
+    audit_p = sub.add_parser(
+        "audit",
+        help="Run Stage 2 Suite I conformal calibration, cohort shift & voxel OOD diagnostic audit.",
+    )
+    audit_p.add_argument("--seed", type=int, default=42, help="Deterministic PCG64 seed (default: 42).")
+    audit_p.add_argument("--alpha", type=float, default=0.10, help="Miscoverage level (default: 0.10).")
+    audit_p.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable AuditReport JSON.",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    from conformal_ivim.audit import run_audit
+
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "demo":
+        if getattr(args, "json", False):
+            report = run_audit(
+                seed=args.seed,
+                n_train=args.n_train,
+                n_cal=args.n_cal,
+                n_test=args.n_test,
+                alpha=args.alpha,
+            )
+            print(report.to_json())
+            return 0
         print(
             run_demo(
                 n_train=args.n_train,
@@ -157,6 +186,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 seed=args.seed,
             )
         )
+        return 0
+    if args.command == "audit":
+        report = run_audit(seed=args.seed, alpha=args.alpha)
+        if getattr(args, "json", False):
+            print(report.to_json())
+        else:
+            print(report.summary_line())
+            for k, v in report.metrics.items():
+                print(f"  {k}: {v}")
         return 0
     parser.print_help(sys.stdout)
     return 0

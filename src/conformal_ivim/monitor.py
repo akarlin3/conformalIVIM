@@ -437,6 +437,90 @@ class DeploymentValidityMonitor:
 DeploymentMonitor = DeploymentValidityMonitor
 
 
+class VoxelOODDetector:
+    """Per-voxel conformal out-of-distribution (OOD) gate combining leave-one-out
+    observable Mahalanobis distances and noise-standardized NLLS residual norms.
+
+    Under calibration/test exchangeability, conformal p-values satisfy
+    ``P(p_j <= alpha) <= alpha``, controlling the per-voxel false-positive rate
+    while flagging localized artifact, partial-volume, or non-bi-exponential voxels.
+    """
+
+    def __init__(self, alpha: float = 0.05):
+        if not (0.0 < float(alpha) < 1.0):
+            raise ValueError(f"alpha must lie in (0, 1); got {alpha}.")
+        self.alpha = float(alpha)
+
+    def fit(
+        self,
+        cal_feat,
+        cal_resid=None,
+        *,
+        b: Sequence[float] = DEFAULT_B_VALUES,
+    ) -> "VoxelOODDetector":
+        """Fit calibration reference score distribution from features or raw DWI signals."""
+        self._mon = DeploymentValidityMonitor(fpr=self.alpha, n_null=64, seed=0)
+        self._mon.fit(cal_feat, cal_resid=cal_resid, b=b)
+        self.b_ = self._mon.b_
+
+        maha_cal = self._mon.cal_maha_
+        sres_cal = self._mon.cal_std_resid_
+        self.mu_maha_ = float(np.mean(maha_cal))
+        self.sd_maha_ = float(np.std(maha_cal)) + 1e-12
+        self.mu_sres_ = float(np.mean(sres_cal))
+        self.sd_sres_ = float(np.std(sres_cal)) + 1e-12
+
+        z_maha = (maha_cal - self.mu_maha_) / self.sd_maha_
+        z_sres = np.abs(sres_cal - self.mu_sres_) / self.sd_sres_
+        self.cal_scores_ = np.sort(np.maximum(z_maha, z_sres))
+        n = self.cal_scores_.size
+        k = int(np.ceil((n + 1) * (1.0 - self.alpha)))
+        self.threshold_ = (
+            float(self.cal_scores_[min(k - 1, n - 1)]) if k <= n else float("inf")
+        )
+        return self
+
+    def score_voxels(
+        self,
+        test_feat,
+        test_resid=None,
+        *,
+        b: Optional[Sequence[float]] = None,
+    ) -> np.ndarray:
+        """Compute joint Mahalanobis / standardized-residual OOD nonconformity scores."""
+        if test_resid is None:
+            b_use = getattr(self, "b_", DEFAULT_B_VALUES) if b is None else b
+            _, test_feat, test_resid = extract_observable_features(test_feat, b=b_use)
+        test_feat = np.atleast_2d(np.asarray(test_feat, dtype=float))
+        test_resid = np.asarray(test_resid, dtype=float).ravel()
+        maha_te = self._mon._maha(test_feat)
+        sres_te = self._mon._std_resid(test_feat, test_resid)
+        z_maha = (maha_te - self.mu_maha_) / self.sd_maha_
+        z_sres = np.abs(sres_te - self.mu_sres_) / self.sd_sres_
+        return np.maximum(z_maha, z_sres)
+
+    def predict_ood(
+        self,
+        test_feat,
+        test_resid=None,
+        *,
+        b: Optional[Sequence[float]] = None,
+    ) -> Dict[str, Any]:
+        """Compute conformal OOD p-values, boolean mask, and flagged voxel fraction."""
+        scores = self.score_voxels(test_feat, test_resid=test_resid, b=b)
+        n_cal = self.cal_scores_.size
+        n_ge = n_cal - np.searchsorted(self.cal_scores_, scores, side="left")
+        p_vals = (1.0 + n_ge.astype(float)) / float(n_cal + 1)
+        ood_mask = p_vals <= self.alpha
+        return {
+            "ood_mask": ood_mask,
+            "p_values": p_vals,
+            "scores": scores,
+            "threshold": self.threshold_,
+            "flagged_fraction": float(np.mean(ood_mask)) if ood_mask.size else 0.0,
+        }
+
+
 def _safe_auc(id_scores, ood_scores) -> float:
     """ROC-AUC separating calibration (ID=0) from deployment (test=1) scores."""
     id_scores = np.asarray(id_scores, dtype=float)
