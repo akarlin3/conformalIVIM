@@ -172,6 +172,49 @@ Conformal coverage guarantees rely on **exchangeability** between the labeled sy
 
 ---
 
+## Multi-Fraction Online Conformal Calibration (`v1.2.0`)
+
+Longitudinal diffusion MRI studies—such as fractionated adaptive radiotherapy ($t = 1, \dots, K$)—experience progressive parenchymal cellularity changes, vascular remodeling, and coil/SNR drift across sessions. `AdaptiveConformalIVIM` (`conformal_ivim.online`) adapts per-parameter uncertainty intervals sequentially across fractions without refitting the base predictor:
+
+- **`method="aci"` (Gibbs & Candès Adaptive Conformal Inference)**: Updates the effective miscoverage target via online pinball subgradient descent:
+  $$
+  \alpha_{t+1} = \alpha_t + \gamma (\alpha - \mathrm{err}_t), \qquad \gamma > 0
+  $$
+- **`method="conformal_pid"` (Conformal PID / Quantile Tracker)**: Combines proportional quantile tracking, nonlinear tangent-saturating integral coverage-deficit control, and smoothed score-trend forecasting to stabilize rolling coverage and interval width.
+- **Label-Free Shift Coupling (`update_from_shift_score`)**: Couples directly to `DeploymentValidityMonitor` so intervals widen conservatively when observable Mahalanobis or bi-exponential residual drift increases between fractions before reference labels arrive.
+
+```python
+from conformal_ivim import AdaptiveConformalIVIM
+
+online_cp = AdaptiveConformalIVIM(method="conformal_pid", alpha=0.10, gamma=0.08)
+online_cp.fit_calibrate(X_train, Y_train, X_cal, Y_cal)
+
+# Update from unlabeled fraction drift before labels arrive, or run full labeled/mixed session:
+online_cp.update_from_shift_score(X_shifted)
+lo_t, hi_t = online_cp.predict_interval(X_shifted)
+```
+
+---
+
+## Single-Voxel OOD & Repeat-Scan Detection (`v1.2.0`)
+
+Complementing the cohort-level `DeploymentValidityMonitor`, `VoxelOODDetector` (`conformal_ivim.ood`) flags localized corrupted voxels (necrotic cavities, motion/RF spikes, susceptibility dropouts) by combining:
+1. Signal-space bi-exponential projection residuals,
+2. Physical monotonicity and positivity violations across increasing $b$-values, and
+3. Local $k$-NN (`cKDTree`) and regularized Mahalanobis leverage in the 9-feature observable summary space.
+
+Each test voxel receives an exact finite-sample conformal p-value $p_{\mathrm{OOD}, i} = (1 + \sum_{j=1}^{n_{\text{cal}}} \mathbf{1}\{T_{\text{cal}, j} \ge T_{\text{test}, i}\}) / (n_{\text{cal}} + 1)$, a boolean `ood_mask`, a scan-level `repeat_scan` alert, and conservatively widened interval guarantees (`adjusted_intervals`).
+
+```python
+from conformal_ivim import VoxelOODDetector
+
+ood = VoxelOODDetector(alpha_ood=0.05).fit(X_cal)
+det = ood.detect(X_test, conformal_model=cqr_ivim)
+print("Flagged OOD fraction:", det["ood_fraction"], "| Repeat scan:", det["repeat_scan"])
+```
+
+---
+
 ## Package Architecture
 
 ```text
@@ -183,15 +226,17 @@ conformalIVIM/
 ├── CITATION.cff
 ├── src/
 │   └── conformal_ivim/
-│       ├── __init__.py       # Clean top-level API (ConformalIVIM, DeploymentValidityMonitor, ...)
+│       ├── __init__.py       # Clean top-level API (ConformalIVIM, AdaptiveConformalIVIM, VoxelOODDetector, ...)
 │       ├── cli.py            # `conformal-ivim demo` fast synthetic verification CLI
 │       ├── forward.py        # 1D bi-exp & 2D (b, TE) IVIM physics, Rician/nc-chi noise, CRLB
 │       ├── estimators.py     # Segmented-init bounded NLLS, 2D VarPro NLLS, GBR quantile regressor
 │       ├── conformal.py      # Split-conformal, CQR, Mondrian, weighted/localized/conditional CP
+│       ├── online.py         # Multi-fraction online ACI, Conformal PID, and shift-score adaptation
+│       ├── ood.py            # Single-voxel conformal OOD p-values, repeat-scan & interval adjustment
 │       ├── monitor.py        # Family-1 Mahalanobis/Hotelling T^2 & Family-2 residual shift tests
 │       ├── metrics.py        # Empirical coverage, sharpness, interval score, conditional grids
 │       └── py.typed          # PEP 561 inline typing marker
-└── tests/                    # Property, unit, and CLI smoke-test suite
+└── tests/                    # Property, unit, online/OOD, and CLI smoke-test suite
 ```
 
 ---

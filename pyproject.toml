@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "conformal-ivim"
-version = "1.0.0"
+version = "1.2.0"
 description = "Distribution-free conformal prediction intervals and label-free deployment monitoring for IVIM diffusion MRI"
 readme = "README.md"
 requires-python = ">=3.9"

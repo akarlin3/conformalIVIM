@@ -3,7 +3,7 @@ label-free deployment monitoring for IVIM diffusion MRI.
 """
 from __future__ import annotations
 
-from conformal_ivim import audit, conformal, estimators, forward, metrics, monitor
+from conformal_ivim import audit, conformal, estimators, forward, metrics, monitor, online, ood
 from conformal_ivim.audit import AuditReport, run_audit
 from conformal_ivim.conformal import (
     ConformalIVIM,
@@ -70,13 +70,14 @@ from conformal_ivim.metrics import (
 from conformal_ivim.monitor import (
     DeploymentMonitor,
     DeploymentValidityMonitor,
-    VoxelOODDetector,
     estimate_importance_weights,
     extract_observable_features,
     signal_shape_features,
 )
+from conformal_ivim.online import AdaptiveConformalIVIM
+from conformal_ivim.ood import VoxelOODDetector
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 
 __all__ = [
     "__version__",
@@ -84,9 +85,10 @@ __all__ = [
     "AuditReport",
     "run_audit",
     "ConformalIVIM",
+    "AdaptiveConformalIVIM",
+    "VoxelOODDetector",
     "DeploymentValidityMonitor",
     "DeploymentMonitor",
-    "VoxelOODDetector",
     "simulate_ivim_signal",
     "compute_crlb",
     # Submodules
@@ -95,6 +97,8 @@ __all__ = [
     "estimators",
     "conformal",
     "monitor",
+    "online",
+    "ood",
     "metrics",
     # Constants & forward physics
     "PARAM_NAMES",

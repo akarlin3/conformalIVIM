@@ -13,9 +13,9 @@ from conformal_ivim.forward import DEFAULT_B_VALUES, generate_cohort
 from conformal_ivim.metrics import coverage_by_stratum, empirical_coverage, regime_terciles
 from conformal_ivim.monitor import (
     DeploymentValidityMonitor,
-    VoxelOODDetector,
     extract_observable_features,
 )
+from conformal_ivim.ood import VoxelOODDetector
 
 SUITE_I_NAME: Literal["Suite I: Clinical Quantitative-MRI Trust Spine"] = (
     "Suite I: Clinical Quantitative-MRI Trust Spine"
