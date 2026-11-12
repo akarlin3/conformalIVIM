@@ -37,9 +37,13 @@ jobs:
       - name: Run test suite
         run: pytest tests/ -q
 
+      - name: Run CLI smoke-test demo
+        run: conformal-ivim demo
+
       - name: Verify wheel and sdist builds
         run: |
           python -m build
           ls -lh dist/
           test -n "$(ls dist/*.whl)"
           test -n "$(ls dist/*.tar.gz)"
+          python -m zipfile -l dist/*.whl | grep "conformal_ivim/py.typed"

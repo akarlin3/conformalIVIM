@@ -12,22 +12,28 @@
 
 ---
 
+## Installation
+
+```bash
+pip install git+https://github.com/akarlin3/conformalIVIM.git
+# Or via PyPI once registered:
+pip install conformal-ivim
+```
+
+For an editable install from source with optional plotting and development extras, plus a `<5s` synthetic CLI verification table covering Split-Conformal, CQR, Mondrian, and two-sample shift monitoring:
+
+```bash
+git clone https://github.com/akarlin3/conformalIVIM.git
+cd conformalIVIM
+pip install -e ".[plotting,dev]"
+conformal-ivim demo
+```
+
 ## 3-Line Quickstart
 
 ```bash
 pip install git+https://github.com/akarlin3/conformalIVIM.git
 python -c "from conformal_ivim import ConformalIVIM, generate_cohort; c = generate_cohort(400, 400, 200); m = ConformalIVIM(method='cqr', alpha=0.10).fit_calibrate(c.signals['train'], c.params['train'], c.signals['cal'], c.params['cal']); lo, hi = m.predict_interval(c.signals['test']); print('90% interval shapes:', lo.shape, hi.shape)"
-```
-
-Once published on PyPI, or to install from a local checkout with optional plotting and development extras:
-
-```bash
-pip install conformal-ivim
-
-# Editable install from source:
-git clone https://github.com/akarlin3/conformalIVIM.git
-cd conformalIVIM
-pip install -e ".[plotting,dev]"
 ```
 
 ---
@@ -157,6 +163,7 @@ Conformal coverage guarantees rely on **exchangeability** between the labeled sy
 
 ```text
 conformalIVIM/
+├── .github/workflows/        # Multi-Python CI (ci.yml) & PyPI Trusted Publishing (publish.yml)
 ├── pyproject.toml
 ├── README.md
 ├── LICENSE
@@ -164,12 +171,14 @@ conformalIVIM/
 ├── src/
 │   └── conformal_ivim/
 │       ├── __init__.py       # Clean top-level API (ConformalIVIM, DeploymentValidityMonitor, ...)
+│       ├── cli.py            # `conformal-ivim demo` fast synthetic verification CLI
 │       ├── forward.py        # 1D bi-exp & 2D (b, TE) IVIM physics, Rician/nc-chi noise, CRLB
 │       ├── estimators.py     # Segmented-init bounded NLLS, 2D VarPro NLLS, GBR quantile regressor
 │       ├── conformal.py      # Split-conformal, CQR, Mondrian, weighted/localized/conditional CP
 │       ├── monitor.py        # Family-1 Mahalanobis/Hotelling T^2 & Family-2 residual shift tests
-│       └── metrics.py        # Empirical coverage, sharpness, interval score, conditional grids
-└── tests/                    # Property and unit test suite
+│       ├── metrics.py        # Empirical coverage, sharpness, interval score, conditional grids
+│       └── py.typed          # PEP 561 inline typing marker
+└── tests/                    # Property, unit, and CLI smoke-test suite
 ```
 
 ---

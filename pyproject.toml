@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Distribution-free conformal prediction intervals and label-free deployment monitoring for IVIM diffusion MRI"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = { text = "MIT" }
 authors = [
     { name = "Avery Karlin", email = "ak5232@columbia.edu" },
 ]
@@ -54,6 +54,9 @@ dev = [
     "matplotlib>=3.5.0",
 ]
 
+[project.scripts]
+conformal-ivim = "conformal_ivim.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/akarlin3/conformalIVIM"
 Repository = "https://github.com/akarlin3/conformalIVIM"
@@ -62,10 +65,12 @@ Zenodo = "https://doi.org/10.5281/zenodo.20694662"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/conformal_ivim"]
+artifacts = ["src/conformal_ivim/py.typed"]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "/src",
+    "/src/conformal_ivim/py.typed",
     "/tests",
     "/README.md",
     "/LICENSE",
