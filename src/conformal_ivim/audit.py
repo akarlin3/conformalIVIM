@@ -1,16 +1,23 @@
 """Standardized AveryCorp Suite I (Stage 2) conformal calibration & shift/OOD audit."""
 from __future__ import annotations
 
+import hashlib
 import json
-from dataclasses import dataclass
-from typing import Any, Literal
+import platform
+from dataclasses import dataclass, field
+from typing import Any, Literal, Mapping
 
 import numpy as np
+import scipy
 
 from conformal_ivim.conformal import aci_conformal, cqr, mondrian_cqr, split_conformal
 from conformal_ivim.estimators import IVIMQuantileRegressor
 from conformal_ivim.forward import DEFAULT_B_VALUES, generate_cohort
-from conformal_ivim.metrics import coverage_by_stratum, empirical_coverage, regime_terciles
+from conformal_ivim.metrics import (
+    coverage_by_stratum,
+    empirical_coverage,
+    regime_terciles,
+)
 from conformal_ivim.monitor import (
     DeploymentValidityMonitor,
     extract_observable_features,
@@ -40,6 +47,69 @@ def _to_builtin(val: Any) -> float | int | str | bool:
     return str(val)
 
 
+def compute_platform_fingerprint() -> dict[str, str]:
+    """Return Python, NumPy, and SciPy runtime version fingerprint."""
+    return {
+        "python": platform.python_version(),
+        "numpy": str(np.__version__),
+        "scipy": str(scipy.__version__),
+    }
+
+
+def compute_input_sha256(tensor_or_bytes: np.ndarray | bytes | memoryview) -> str:
+    """Compute deterministic SHA-256 hex digest over canonical little-endian float64 tensor or raw bytes."""
+    if isinstance(tensor_or_bytes, (bytes, bytearray, memoryview)):
+        raw = bytes(tensor_or_bytes)
+    else:
+        raw = np.ascontiguousarray(tensor_or_bytes, dtype="<f8").tobytes(order="C")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def compute_report_sha256(core_fields: Mapping[str, Any]) -> str:
+    """Compute canonical SHA-256 digest over sorted 9 core AuditReport fields."""
+    canonical = {
+        "package": str(core_fields["package"]),
+        "version": str(core_fields["version"]),
+        "suite": str(core_fields["suite"]),
+        "stage_role": str(core_fields["stage_role"]),
+        "status": str(core_fields["status"]),
+        "verdict": str(core_fields["verdict"]),
+        "seed": int(core_fields["seed"]),
+        "metrics": {str(k): _to_builtin(v) for k, v in dict(core_fields["metrics"]).items()},
+        "thresholds": {str(k): _to_builtin(v) for k, v in dict(core_fields["thresholds"]).items()},
+    }
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()
+
+
+@dataclass(frozen=True)
+class AuditAttestation:
+    """Cryptographic provenance and deterministic execution attestation for an ``AuditReport``."""
+
+    input_sha256: str
+    report_sha256: str
+    platform_fingerprint: dict[str, str] = field(default_factory=compute_platform_fingerprint)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "input_sha256", str(self.input_sha256))
+        object.__setattr__(self, "report_sha256", str(self.report_sha256))
+        object.__setattr__(
+            self,
+            "platform_fingerprint",
+            {str(k): str(v) for k, v in self.platform_fingerprint.items()},
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize attestation to a JSON-compatible dictionary."""
+        return {
+            "input_sha256": str(self.input_sha256),
+            "report_sha256": str(self.report_sha256),
+            "platform_fingerprint": {str(k): str(v) for k, v in self.platform_fingerprint.items()},
+        }
+
+
 @dataclass(frozen=True)
 class AuditReport:
     """Standardized AveryCorp scientific identifiability and diagnostic audit report."""
@@ -53,9 +123,10 @@ class AuditReport:
     metrics: dict[str, float | int | str | bool]
     thresholds: dict[str, float | int | str]
     seed: int
+    attestation: AuditAttestation | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the audit report to a JSON-compatible Python dictionary."""
+    def core_dict(self) -> dict[str, Any]:
+        """Return the 9 core fields hashed by ``report_sha256``."""
         return {
             "package": str(self.package),
             "version": str(self.version),
@@ -67,6 +138,12 @@ class AuditReport:
             "thresholds": {str(k): _to_builtin(v) for k, v in self.thresholds.items()},
             "seed": int(self.seed),
         }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the audit report to a JSON-compatible Python dictionary."""
+        out = self.core_dict()
+        out["attestation"] = self.attestation.to_dict() if self.attestation is not None else None
+        return out
 
     def to_json(self, indent: int = 2) -> str:
         """Serialize the audit report to a formatted JSON string."""
@@ -186,29 +263,50 @@ def run_audit(
             f"(marginal = {cov_mondrian_cqr:.3f}, high-D* = {high_dstar_cov:.3f})."
         )
 
+    stage_role_str = "Stage 2: Split/CQR/Mondrian/ACI Conformal Calibration, Cohort Shift & Voxel OOD Gate"
+    metrics_dict: dict[str, float | int | str | bool] = {
+        "marginal_coverage_split": round(cov_split, 6),
+        "marginal_coverage_cqr": round(cov_cqr, 6),
+        "marginal_coverage_mondrian_cqr": round(cov_mondrian_cqr, 6),
+        "marginal_coverage_aci": round(cov_aci, 6),
+        "high_dstar_tercile_coverage": round(high_dstar_cov, 6),
+        "hotelling_t2_p_value": round(hotelling_p, 6),
+        "cohort_shift_fires": monitor_fires,
+        "voxel_ood_flagged_fraction": round(flagged_fraction, 6),
+    }
+    thresholds_dict: dict[str, float | int | str] = {
+        "nominal_coverage": round(1.0 - float(alpha), 4),
+        "min_marginal_coverage": float(min_marginal_coverage),
+        "min_high_dstar_coverage": float(min_high_dstar_coverage),
+        "min_hotelling_p": float(min_hotelling_p),
+        "max_ood_flagged_fraction": float(max_ood_flagged_fraction),
+    }
+    core_payload = {
+        "package": "conformal-ivim",
+        "version": __version__,
+        "suite": SUITE_I_NAME,
+        "stage_role": stage_role_str,
+        "status": status,
+        "verdict": verdict,
+        "metrics": metrics_dict,
+        "thresholds": thresholds_dict,
+        "seed": int(seed),
+    }
+    attestation = AuditAttestation(
+        input_sha256=compute_input_sha256(X_te),
+        report_sha256=compute_report_sha256(core_payload),
+        platform_fingerprint=compute_platform_fingerprint(),
+    )
+
     return AuditReport(
         package="conformal-ivim",
         version=__version__,
         suite=SUITE_I_NAME,
-        stage_role="Stage 2: Split/CQR/Mondrian/ACI Conformal Calibration, Cohort Shift & Voxel OOD Gate",
+        stage_role=stage_role_str,
         status=status,
         verdict=verdict,
-        metrics={
-            "marginal_coverage_split": round(cov_split, 6),
-            "marginal_coverage_cqr": round(cov_cqr, 6),
-            "marginal_coverage_mondrian_cqr": round(cov_mondrian_cqr, 6),
-            "marginal_coverage_aci": round(cov_aci, 6),
-            "high_dstar_tercile_coverage": round(high_dstar_cov, 6),
-            "hotelling_t2_p_value": round(hotelling_p, 6),
-            "cohort_shift_fires": monitor_fires,
-            "voxel_ood_flagged_fraction": round(flagged_fraction, 6),
-        },
-        thresholds={
-            "nominal_coverage": round(1.0 - float(alpha), 4),
-            "min_marginal_coverage": float(min_marginal_coverage),
-            "min_high_dstar_coverage": float(min_high_dstar_coverage),
-            "min_hotelling_p": float(min_hotelling_p),
-            "max_ood_flagged_fraction": float(max_ood_flagged_fraction),
-        },
+        metrics=metrics_dict,
+        thresholds=thresholds_dict,
         seed=int(seed),
+        attestation=attestation,
     )

@@ -58,7 +58,7 @@ class _FastBiasedPointEstimator:
 
 
 def test_version_and_top_level_exports():
-    assert conformal_ivim.__version__ == "1.2.0"
+    assert conformal_ivim.__version__ == "1.3.0"
     assert hasattr(conformal_ivim, "AdaptiveConformalIVIM")
     assert hasattr(conformal_ivim, "VoxelOODDetector")
 

@@ -1,0 +1,51 @@
+{
+  "input_sha256": "47f49d521c84ce6fb9c7d998bff6fc7fec3b237d7db0b20cd512d523a9e581d0",
+  "package": "conformal-ivim",
+  "platform_fingerprint": {
+    "numpy": "2.4.6",
+    "python": "3.11.2",
+    "scipy": "1.17.1"
+  },
+  "report": {
+    "attestation": {
+      "input_sha256": "47f49d521c84ce6fb9c7d998bff6fc7fec3b237d7db0b20cd512d523a9e581d0",
+      "platform_fingerprint": {
+        "numpy": "2.4.6",
+        "python": "3.11.2",
+        "scipy": "1.17.1"
+      },
+      "report_sha256": "1a009dd6389996a89eb3a98e560302497d33211175b230a01173976c5e6fbaa3"
+    },
+    "metrics": {
+      "cohort_shift_fires": false,
+      "high_dstar_tercile_coverage": 0.880597,
+      "hotelling_t2_p_value": 0.324748,
+      "marginal_coverage_aci": 0.895,
+      "marginal_coverage_cqr": 0.92,
+      "marginal_coverage_mondrian_cqr": 0.93,
+      "marginal_coverage_split": 0.86,
+      "voxel_ood_flagged_fraction": 0.085
+    },
+    "package": "conformal-ivim",
+    "seed": 42,
+    "stage_role": "Stage 2: Split/CQR/Mondrian/ACI Conformal Calibration, Cohort Shift & Voxel OOD Gate",
+    "status": "PASS",
+    "suite": "Suite I: Clinical Quantitative-MRI Trust Spine",
+    "thresholds": {
+      "max_ood_flagged_fraction": 0.12,
+      "min_high_dstar_coverage": 0.78,
+      "min_hotelling_p": 0.05,
+      "min_marginal_coverage": 0.84,
+      "nominal_coverage": 0.9
+    },
+    "verdict": "EXCHANGEABLE_AND_CALIBRATED: Mondrian-CQR coverage = 0.930 (high-D* tercile = 0.881), Hotelling p = 0.325, OOD flagged = 0.085.",
+    "version": "1.3.0"
+  },
+  "report_sha256": "1a009dd6389996a89eb3a98e560302497d33211175b230a01173976c5e6fbaa3",
+  "schema_version": "1.0.0",
+  "seed": 42,
+  "stage_role": "Stage 2: Split/CQR/Mondrian/ACI Conformal Calibration, Cohort Shift & Voxel OOD Gate",
+  "status": "PASS",
+  "suite": "Suite I: Clinical Quantitative-MRI Trust Spine",
+  "version": "1.3.0"
+}

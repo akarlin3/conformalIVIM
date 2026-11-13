@@ -16,8 +16,8 @@ identifiers:
     value: "10.5281/zenodo.20694662"
     description: "Zenodo software archive for conformalIVIM"
 license: MIT
-version: 1.0.0
-date-released: 2026-11-10
+version: 1.3.0
+date-released: 2026-11-12
 keywords:
   - IVIM
   - intravoxel incoherent motion

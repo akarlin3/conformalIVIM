@@ -14,6 +14,7 @@ generation, and analytical Fisher information / CRLB calculators.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib.util
 from typing import Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -33,6 +34,45 @@ CLINICAL_B = np.array(
     [0, 10, 20, 40, 60, 80, 100, 200, 400, 600, 800],
     dtype=float,
 )
+
+_FALLBACK_CLINICAL_SCHEDULES: Dict[str, Tuple[float, ...]] = {
+    "osipi": (0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 75.0, 100.0, 150.0, 250.0, 400.0, 600.0),
+    "tcga_lihc": (0.0, 50.0, 500.0, 800.0),
+    "acrin_6698": (0.0, 100.0, 600.0, 800.0),
+    "lattice_22b": (
+        0.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 50.0, 60.0, 80.0, 100.0,
+        120.0, 150.0, 200.0, 250.0, 300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 1000.0,
+    ),
+}
+
+
+def has_ivimbench_phantoms() -> bool:
+    """Return ``True`` when ``ivimbench`` is available in the Python environment."""
+    return importlib.util.find_spec("ivimbench") is not None
+
+
+def resolve_clinical_b(
+    b: Union[Sequence[float], np.ndarray, str],
+    *,
+    use_canonical_dro: bool = False,
+) -> np.ndarray:
+    """Resolve an array of ``b``-values or a named clinical schedule (``osipi``, ``tcga_lihc``, ``acrin_6698``)."""
+    if isinstance(b, str):
+        key = b.strip().lower()
+        if use_canonical_dro and has_ivimbench_phantoms():
+            import importlib as _importlib
+
+            proto_mod = _importlib.import_module("ivimbench.protocols")
+            res = proto_mod.resolve_bvalues(key)
+            arr = res[0] if isinstance(res, tuple) else res
+            return np.asarray(arr, dtype=float)
+        if key in _FALLBACK_CLINICAL_SCHEDULES:
+            return np.asarray(_FALLBACK_CLINICAL_SCHEDULES[key], dtype=float)
+        raise ValueError(
+            f"Unknown clinical b-schedule {b!r}; supported fallback keys: "
+            f"{sorted(_FALLBACK_CLINICAL_SCHEDULES)}."
+        )
+    return np.asarray(b, dtype=float)
 
 # Published abdominal/hepatic IVIM physiological parameter ranges (mm^2/s for D, D*).
 D_RANGE: Tuple[float, float] = (0.5e-3, 3.0e-3)
@@ -524,6 +564,59 @@ def crlb_optimal_scheme(n_b=11, seed=DEFAULT_SEED):
 # --------------------------------------------------------------------------- #
 # Clean High-Level Public API Functions: simulate_ivim_signal & compute_crlb
 # --------------------------------------------------------------------------- #
+def _evaluate_family_clean_1d(
+    b_arr: np.ndarray,
+    d_vec: np.ndarray,
+    ds_vec: np.ndarray,
+    f_vec: np.ndarray,
+    s0_vec: np.ndarray,
+    *,
+    family: str = "biexp",
+    use_canonical_dro: bool = False,
+) -> np.ndarray:
+    fam = str(family).strip().lower()
+    if use_canonical_dro and has_ivimbench_phantoms():
+        import importlib as _importlib
+
+        ph_mod = _importlib.import_module("ivimbench.phantoms")
+        d1 = np.asarray(d_vec, dtype=float).ravel()
+        ds1 = np.asarray(ds_vec, dtype=float).ravel()
+        f1 = np.asarray(f_vec, dtype=float).ravel()
+        s01 = np.asarray(s0_vec, dtype=float).ravel()
+        if fam == "biexp":
+            return np.asarray(ph_mod.ivim_biexp(b_arr, d1, ds1, f1, s0=s01), dtype=float)
+        if fam == "dispersion_gamma":
+            return np.asarray(ph_mod.ivim_dispersion_gamma(b_arr, d1, ds1, 4.0, f1, s0=s01), dtype=float)
+        if fam == "dispersion_lognormal":
+            return np.asarray(ph_mod.ivim_dispersion_lognormal(b_arr, d1, ds1, 0.5, f1, s0=s01), dtype=float)
+        if fam == "stretched":
+            return np.asarray(ph_mod.ivim_stretched(b_arr, d1, ds1, f1, 0.7, s0=s01), dtype=float)
+        if fam == "triexp":
+            return np.asarray(ph_mod.ivim_triexp(b_arr, d1, ds1, f1, 4.0 * ds1, 0.3, s0=s01), dtype=float)
+        raise ValueError(f"Unknown IVIM family {family!r}.")
+
+    d_b = np.asarray(d_vec, dtype=float).reshape(-1, 1)
+    ds_b = np.asarray(ds_vec, dtype=float).reshape(-1, 1)
+    f_b = np.asarray(f_vec, dtype=float).reshape(-1, 1)
+    s0_b = np.asarray(s0_vec, dtype=float).reshape(-1, 1)
+    if fam == "biexp":
+        return ivim_signal(b_arr[None, :], d_b, ds_b, f_b, S0=s0_b)
+    if fam == "dispersion_gamma":
+        return ivim_signal_dispersion(b_arr[None, :], d_b, ds_b, 4.0, f_b, S0=s0_b)
+    if fam == "dispersion_lognormal":
+        return ivim_signal_lognormal_dispersion(
+            b_arr[None, :], d_b, ds_b, 0.5, f_b, S0=s0_b
+        )
+    if fam == "stretched":
+        return ivim_signal_stretched(b_arr[None, :], d_b, ds_b, f_b, 0.7, S0=s0_b)
+    if fam == "triexp":
+        return ivim_signal_triexp(b_arr[None, :], d_b, ds_b, f_b, 4.0 * ds_b, 0.3, S0=s0_b)
+    raise ValueError(
+        f"Unknown IVIM family {family!r}; expected one of "
+        "('biexp', 'dispersion_gamma', 'dispersion_lognormal', 'stretched', 'triexp')."
+    )
+
+
 def simulate_ivim_signal(
     b=DEFAULT_B_VALUES,
     D=1.2e-3,
@@ -538,38 +631,12 @@ def simulate_ivim_signal(
     ncchi_coils=1,
     seed=None,
     rng=None,
+    *,
+    use_canonical_dro: bool = False,
+    family: str = "biexp",
 ):
-    """Simulate clean or noisy 1D multi-b or 2D (b, TE) IVIM signals.
-
-    Supports both single-voxel scalar parameters (returning shape ``(n_b,)``)
-    and batch 1D parameter arrays of length ``N`` (returning shape ``(N, n_b)``).
-
-    Parameters
-    ----------
-    b : array-like, default=DEFAULT_B_VALUES
-        Diffusion-weighting b-values in s/mm^2.
-    D, Dstar, f : float or 1D array-like of shape (N,)
-        Parenchymal diffusivity (mm^2/s), pseudo-diffusivity (mm^2/s), and
-        perfusion fraction in [0, 1].
-    S0 : float or 1D array-like, default=1.0
-        Baseline unweighted signal intensity.
-    snr : float, 1D array-like, or None, default=None
-        Signal-to-noise ratio at b=0 (or at (b=0, TE=TE_min) when ``te`` is given).
-        If ``None``, returns exact noise-free signals.
-    noise : {'rician', 'gaussian', 'ncchi'}, default='rician'
-        Noise model used when ``snr`` is provided.
-    te : array-like or None, default=None
-        Optional echo times in ms matching ``b`` for 2D S(b, TE) simulation.
-    T2_tissue, T2_blood : float
-        Transverse relaxation constants in ms used when ``te`` is provided.
-    ncchi_coils : int, default=1
-        Number of coils L when ``noise='ncchi'``.
-    seed : int or None, default=None
-        Seed for deterministic noise generation when ``rng`` is not supplied.
-    rng : numpy.random.Generator or None, default=None
-        Explicit NumPy random generator.
-    """
-    b_arr = np.asarray(b, dtype=float)
+    """Simulate clean or noisy 1D multi-b or 2D (b, TE) IVIM signals with optional canonical DRO delegation."""
+    b_arr = resolve_clinical_b(b, use_canonical_dro=use_canonical_dro)
     D_arr = np.asarray(D, dtype=float)
     Ds_arr = np.asarray(Dstar, dtype=float)
     f_arr = np.asarray(f, dtype=float)
@@ -593,7 +660,12 @@ def simulate_ivim_signal(
         f_b = np.broadcast_to(f_arr, (N,))[:, None]
         S0_b = np.broadcast_to(S0_arr, (N,))[:, None]
         if te is None:
-            clean = ivim_signal(b_arr[None, :], D_b, Ds_b, f_b, S0=S0_b)
+            if family == "biexp" and not use_canonical_dro:
+                clean = ivim_signal(b_arr[None, :], D_b, Ds_b, f_b, S0=S0_b)
+            else:
+                clean = _evaluate_family_clean_1d(
+                    b_arr, D_b, Ds_b, f_b, S0_b, family=family, use_canonical_dro=use_canonical_dro
+                )
             s_ref = S0_b
         else:
             te_arr = np.asarray(te, dtype=float)
@@ -616,9 +688,20 @@ def simulate_ivim_signal(
             )
     else:
         if te is None:
-            clean = ivim_signal(
-                b_arr, float(D_arr), float(Ds_arr), float(f_arr), S0=float(S0_arr)
-            )
+            if family == "biexp" and not use_canonical_dro:
+                clean = ivim_signal(
+                    b_arr, float(D_arr), float(Ds_arr), float(f_arr), S0=float(S0_arr)
+                )
+            else:
+                clean = _evaluate_family_clean_1d(
+                    b_arr,
+                    np.array([float(D_arr)]),
+                    np.array([float(Ds_arr)]),
+                    np.array([float(f_arr)]),
+                    np.array([float(S0_arr)]),
+                    family=family,
+                    use_canonical_dro=use_canonical_dro,
+                )[0]
             s_ref = float(S0_arr)
         else:
             te_arr = np.asarray(te, dtype=float)
@@ -812,14 +895,44 @@ class Cohort:
         return {k: v.shape[0] for k, v in self.signals.items()}
 
 
-def _draw_split(n: int, snr_grid: Sequence[float], b: np.ndarray, rng: np.random.Generator):
-    D = rng.uniform(*D_RANGE, size=n)
-    Dstar = rng.uniform(*DSTAR_RANGE, size=n)
-    f = rng.uniform(*F_RANGE, size=n)
+def _draw_split(
+    n: int,
+    snr_grid: Sequence[float],
+    b: np.ndarray,
+    rng: np.random.Generator,
+    *,
+    use_canonical_dro: bool = False,
+    family: str = "biexp",
+    organ: Optional[str] = None,
+):
+    if use_canonical_dro and organ is not None and has_ivimbench_phantoms():
+        import importlib as _importlib
+
+        ph_mod = _importlib.import_module("ivimbench.phantoms")
+        params = np.asarray(
+            ph_mod.sample_organ_params(organ=organ, n_voxels=n, seed=rng),
+            dtype=float,
+        )
+        D, Dstar, f = params[:, 0], params[:, 1], params[:, 2]
+    else:
+        D = rng.uniform(*D_RANGE, size=n)
+        Dstar = rng.uniform(*DSTAR_RANGE, size=n)
+        f = rng.uniform(*F_RANGE, size=n)
+        params = np.stack([D, Dstar, f], axis=1)
     snr = rng.choice(np.asarray(snr_grid, dtype=float), size=n)
-    clean = ivim_signal(b[None, :], D[:, None], Dstar[:, None], f[:, None], S0=1.0)
+    if family == "biexp" and not use_canonical_dro:
+        clean = ivim_signal(b[None, :], D[:, None], Dstar[:, None], f[:, None], S0=1.0)
+    else:
+        clean = _evaluate_family_clean_1d(
+            b,
+            D[:, None],
+            Dstar[:, None],
+            f[:, None],
+            np.ones((n, 1), dtype=float),
+            family=family,
+            use_canonical_dro=use_canonical_dro,
+        )
     noisy = add_rician_noise(clean, snr[:, None], rng, S0=1.0)
-    params = np.stack([D, Dstar, f], axis=1)
     return noisy, params, snr
 
 
@@ -828,15 +941,27 @@ def generate_cohort(
     n_cal: int,
     n_test: int,
     snr_grid: Sequence[float] = DEFAULT_SNR_GRID,
-    b: Sequence[float] = DEFAULT_B_VALUES,
+    b: Union[Sequence[float], str] = DEFAULT_B_VALUES,
     seed: int = DEFAULT_SEED,
+    *,
+    use_canonical_dro: bool = False,
+    family: str = "biexp",
+    organ: Optional[str] = None,
 ) -> Cohort:
     """Generate a reproducible train/cal/test synthetic IVIM cohort."""
-    b_arr = np.asarray(b, dtype=float)
+    b_arr = resolve_clinical_b(b, use_canonical_dro=use_canonical_dro)
     rng = np.random.default_rng(seed)
     signals, params, snr = {}, {}, {}
     for name, n in (("train", n_train), ("cal", n_cal), ("test", n_test)):
-        s, p, r = _draw_split(n, snr_grid, b_arr, rng)
+        s, p, r = _draw_split(
+            n,
+            snr_grid,
+            b_arr,
+            rng,
+            use_canonical_dro=use_canonical_dro,
+            family=family,
+            organ=organ,
+        )
         signals[name], params[name], snr[name] = s, p, r
     return Cohort(
         b=b_arr,
@@ -846,3 +971,4 @@ def generate_cohort(
         params=params,
         snr=snr,
     )
+

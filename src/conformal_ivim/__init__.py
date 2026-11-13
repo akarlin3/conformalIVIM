@@ -3,8 +3,18 @@ label-free deployment monitoring for IVIM diffusion MRI.
 """
 from __future__ import annotations
 
-from conformal_ivim import audit, conformal, estimators, forward, metrics, monitor, online, ood
-from conformal_ivim.audit import AuditReport, run_audit
+from conformal_ivim import (
+    audit,
+    conformal,
+    estimators,
+    forward,
+    lethe_repeatability,
+    metrics,
+    monitor,
+    online,
+    ood,
+)
+from conformal_ivim.audit import AuditAttestation, AuditReport, run_audit
 from conformal_ivim.conformal import (
     ConformalIVIM,
     aci_conformal,
@@ -19,9 +29,9 @@ from conformal_ivim.conformal import (
     weighted_split_conformal,
 )
 from conformal_ivim.estimators import (
+    PARAM_NAMES,
     IVIMQuantileRegressor,
     NLLSEstimator,
-    PARAM_NAMES,
     fit_nlls,
     fit_nlls_batch,
     fit_varpro_2d_batch,
@@ -29,13 +39,13 @@ from conformal_ivim.estimators import (
 )
 from conformal_ivim.forward import (
     CLINICAL_B,
+    D_RANGE,
     DEFAULT_B_VALUES,
     DEFAULT_SEED,
     DEFAULT_SNR_GRID,
     DEFAULT_T2_BLOOD,
     DEFAULT_T2_TISSUE,
     DSTAR_RANGE,
-    D_RANGE,
     F_RANGE,
     Cohort,
     add_gaussian_noise,
@@ -49,12 +59,20 @@ from conformal_ivim.forward import (
     crlb_optimal_scheme,
     design_crlb_dstar,
     generate_cohort,
+    has_ivimbench_phantoms,
     ivim_jacobian,
     ivim_jacobian_2d,
     ivim_signal,
     ivim_signal_2d,
     ivim_signal_triexp,
+    resolve_clinical_b,
     simulate_ivim_signal,
+)
+from conformal_ivim.lethe_repeatability import (
+    LetheRepeatabilityReport,
+    bca_bootstrap_ci,
+    evaluate_echo_repeatability_scale,
+    run_reverb_precision_coverage_counterexample,
 )
 from conformal_ivim.metrics import (
     conditional_coverage_grid,
@@ -77,11 +95,12 @@ from conformal_ivim.monitor import (
 from conformal_ivim.online import AdaptiveConformalIVIM
 from conformal_ivim.ood import VoxelOODDetector
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = [
     "__version__",
     # Core public API & Audit Contract
+    "AuditAttestation",
     "AuditReport",
     "run_audit",
     "ConformalIVIM",
@@ -89,13 +108,20 @@ __all__ = [
     "VoxelOODDetector",
     "DeploymentValidityMonitor",
     "DeploymentMonitor",
+    "LetheRepeatabilityReport",
+    "bca_bootstrap_ci",
+    "evaluate_echo_repeatability_scale",
+    "run_reverb_precision_coverage_counterexample",
     "simulate_ivim_signal",
     "compute_crlb",
+    "has_ivimbench_phantoms",
+    "resolve_clinical_b",
     # Submodules
     "audit",
     "forward",
     "estimators",
     "conformal",
+    "lethe_repeatability",
     "monitor",
     "online",
     "ood",

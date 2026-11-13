@@ -10,10 +10,17 @@ import numpy as np
 
 from conformal_ivim import __version__
 from conformal_ivim.conformal import mondrian_cqr, mondrian_split, split_conformal
-from conformal_ivim.estimators import IVIMQuantileRegressor, PARAM_NAMES
-from conformal_ivim.forward import DEFAULT_B_VALUES, generate_cohort, simulate_ivim_signal
+from conformal_ivim.estimators import PARAM_NAMES, IVIMQuantileRegressor
+from conformal_ivim.forward import (
+    DEFAULT_B_VALUES,
+    generate_cohort,
+    simulate_ivim_signal,
+)
 from conformal_ivim.metrics import empirical_coverage, interval_width
-from conformal_ivim.monitor import DeploymentValidityMonitor, extract_observable_features
+from conformal_ivim.monitor import (
+    DeploymentValidityMonitor,
+    extract_observable_features,
+)
 
 
 def run_demo(
@@ -158,11 +165,25 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit machine-readable AuditReport JSON.",
     )
+
+    rep_p = sub.add_parser(
+        "repeatability-check",
+        help="Run Lethe/Echo scan-rescan repeatability scale check and Reverb counterexample.",
+    )
+    rep_p.add_argument("--n-voxels", type=int, default=1000, help="Number of synthetic voxels (default: 1000).")
+    rep_p.add_argument("--seed", type=int, default=42, help="Deterministic PCG64 seed (default: 42).")
+    rep_p.add_argument("--alpha", type=float, default=0.10, help="Miscoverage level (default: 0.10).")
+    rep_p.add_argument("--json", action="store_true", help="Emit JSON output.")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    import json
+
     from conformal_ivim.audit import run_audit
+    from conformal_ivim.lethe_repeatability import (
+        run_reverb_precision_coverage_counterexample,
+    )
 
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -195,6 +216,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(report.summary_line())
             for k, v in report.metrics.items():
                 print(f"  {k}: {v}")
+        return 0
+    if args.command == "repeatability-check":
+        res = run_reverb_precision_coverage_counterexample(
+            n_voxels=args.n_voxels,
+            seed=args.seed,
+            alpha=args.alpha,
+        )
+        if getattr(args, "json", False):
+            print(json.dumps(res, indent=2))
+        else:
+            print(
+                f"conformal-ivim v{__version__} Lethe/Reverb Repeatability Check "
+                f"(n={res['n_voxels']}, seed={res['seed']}): "
+                f"truth_cov={res['empirical_truth_coverage']:.3f} vs "
+                f"retest_cov={res['empirical_scan_rescan_coverage']:.3f} "
+                f"(deficit={res['repeatability_coverage_deficit']:+.3f})"
+            )
         return 0
     parser.print_help(sys.stdout)
     return 0

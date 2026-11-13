@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "conformal-ivim"
-version = "1.2.0"
+version = "1.3.0"
 description = "Distribution-free conformal prediction intervals and label-free deployment monitoring for IVIM diffusion MRI"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -76,6 +76,8 @@ include = [
     "/LICENSE",
     "/CITATION.cff",
     "/pyproject.toml",
+    "/audit-baseline.json",
+    "/audit-lock.json",
 ]
 
 [tool.pytest.ini_options]
